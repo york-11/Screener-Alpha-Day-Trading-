@@ -104,22 +104,20 @@ def scan_single_stock(ticker):
         if cond_sideways and (h1['Close'] < h1['SMA_5']) and (h0['Close'] > h0['SMA_5']) and (((h0['Close'] - h0['SMA_5']) / h0['SMA_5']) * 100 >= 10) and (h0['Value_Trx'] >= 5_000_000_000):
             triggered_strategies.append("V2.2 (Sideways Breakout + Value > 5B)")
 
-    # ==========================================
-    # RUMUS BB REVERSAL (CUSTOM UPDATE)
-    # ==========================================
-    # H-1 (Kemarin)
-    cond1 = df['Low'].shift(1) < df['BB_LOWER'].shift(1)
-    cond2 = df['Close'].shift(1) < df['BB_LOWER'].shift(1)
-    
-    # H-0 (Hari Ini)
-    cond3 = df['Close'] > df['BB_LOWER']
-    cond4 = df['Value_Trx'] > 1_000_000_000  # Value > 1 Miliar
-    cond5 = df['Volume'] > df['Volume'].shift(1)
-    cond6 = df['High'] > df['High'].shift(1)
-    cond7 = df['Close'] > df['Close'].shift(1)
-    
-    # Gabungkan semua kondisi
-    df['BB_Rev_Signal'] = cond1 & cond2 & cond3 & cond4 & cond5 & cond6 & cond7
+    # 6. BB Reversal (CUSTOM UPDATE)
+        # c1 & c2 = Syarat H-1
+        c1 = h1['Low'] < h1['BB_LOWER']
+        c2 = h1['Close'] < h1['BB_LOWER']
+        
+        # c3 sampai c7 = Syarat H-0 (Hari ini)
+        c3 = h0['Close'] > h0['BB_LOWER']
+        c4 = h0['Value_Trx'] > 1_000_000_000
+        c5 = h0['Volume'] > h1['Volume']
+        c6 = h0['High'] > h1['High']
+        c7 = h0['Close'] > h1['Close']
+        
+        if c1 and c2 and c3 and c4 and c5 and c6 and c7:
+            triggered_strategies.append("BB Reversal (Volume Breakout)")
 
         # 7. BB Mid Pullback
         if (h1['Close'] > h1['Open']) and (h1['Low'] > h1['BB_MID']) and (h0['Close'] < h0['Open']) and (h0['Close'] >= h0['BB_MID']) and (h0['Low'] <= h0['BB_MID'] * 1.02):
