@@ -123,9 +123,25 @@ def scan_single_stock(ticker):
         if (h1['Close'] > h1['Open']) and (h1['Low'] > h1['BB_MID']) and (h0['Close'] < h0['Open']) and (h0['Close'] >= h0['BB_MID']) and (h0['Low'] <= h0['BB_MID'] * 1.02):
             triggered_strategies.append("BB MID (Pullback to Mid Band)")
 
-        # 8. MA50 Pullback
-        if (h0['MA_50'] > h0['MA_200']) and (h1['Close'] > h1['Open']) and (h1['Low'] > h1['MA_50']) and (h0['Close'] < h0['Open']) and (h0['Close'] >= h0['MA_50']) and (h0['Low'] <= h0['MA_50'] * 1.02):
-            triggered_strategies.append("MA 50 / 200 (Uptrend Pullback)")
+        # Hitung Prev LLV(Low, 5) menggunakan index iloc 
+        # (mengambil nilai Low terkecil dari 5 baris sebelum baris terakhir/hari ini)
+        prev_llv_low_5 = df['Low'].iloc[-6:-1].min()
+
+        # 8. MA 50 Pullback (CUSTOM UPDATE)
+        c_ma50_1 = prev_llv_low_5 > h0['MA_50']
+        c_ma50_2 = (h0['Close'] >= h0['MA_50'] * 0.99) and (h0['Close'] <= h0['MA_50'] * 1.02)
+        c_ma50_3 = h0['Value_Trx'] > 1_000_000_000
+        
+        if c_ma50_1 and c_ma50_2 and c_ma50_3:
+            triggered_strategies.append("MA 50 (Pullback Tolerance)")
+
+        # 9. MA 200 Pullback (NEW)
+        c_ma200_1 = prev_llv_low_5 > h0['MA_200']
+        c_ma200_2 = (h0['Close'] >= h0['MA_200'] * 0.99) and (h0['Close'] <= h0['MA_200'] * 1.02)
+        c_ma200_3 = h0['Value_Trx'] > 1_000_000_000
+        
+        if c_ma200_1 and c_ma200_2 and c_ma200_3:
+            triggered_strategies.append("MA 200 (Pullback Tolerance)")
 
         # Jika ada rumus yang terpicu, kembalikan datanya
         if triggered_strategies:
@@ -181,9 +197,10 @@ if st.button("🚀 MULAI PEMINDAIAN SELURUH SAHAM IDX (REAL-TIME)"):
             "V1.3 (Breakout Resisten)",
             "V2.1 (Break SMA5 > 10% + Value > 5B)",
             "V2.2 (Sideways Breakout + Value > 5B)",
-            "BB Reversal (Buy on Lower BB)",
+            "BB Reversal (Volume Breakout)",
             "BB MID (Pullback to Mid Band)",
-            "MA 50 / 200 (Uptrend Pullback)"
+            "MA 50 (Pullback Tolerance)",
+            "MA 200 (Pullback Tolerance)"
         ]
         
         st.markdown("### 📊 Hasil Berdasarkan Strategi")
