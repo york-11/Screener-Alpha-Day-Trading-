@@ -82,12 +82,10 @@ def scan_single_stock(ticker):
         df['MA_50'] = df['Close'].rolling(window=50).mean()
         df['MA_200'] = df['Close'].rolling(window=200).mean()
         
-        # Tambahan Indikator untuk BB MID
-        df['EMA_10'] = df['Close'].ewm(span=10, adjust=False).mean()
-        df['EMA_20'] = df['Close'].ewm(span=20, adjust=False).mean()
-        df['EMA_50'] = df['Close'].ewm(span=50, adjust=False).mean()
-        df['BB_UPPER'] = df['BB_MID'] + (2 * df['STD_20'])
-        df['BB_BANDWIDTH'] = (df['BB_UPPER'] - df['BB_LOWER']) / df['BB_MID']
+        # Bollinger Bands
+        df['BB_MID'] = df['Close'].rolling(window=20).mean()
+        df['STD_20'] = df['Close'].rolling(window=20).std()
+        df['BB_LOWER'] = df['BB_MID'] - (2 * df['STD_20'])
 
         # Ambil baris TERAKHIR (Hari ini / Hari Bursa Terakhir)
         # Serta baris-baris sebelumnya untuk logika H-1, H-2, dst.
@@ -116,7 +114,7 @@ def scan_single_stock(ticker):
         c_12_3 = h1['Close'] < h2['Close']
         c_12_4 = h0['Close'] < h1['Close']
         c_12_5 = h0['Value_Trx'] > 1_000_000_000
-        if c_12_1 and c_12_2 and c_12_3 and c_12_4 and c_12_5 and c_12_6:
+        if c_12_1 and c_12_2 and c_12_3 and c_12_4 and c_12_5:
             triggered_strategies.append("V1.2 (Pullback)")
 
         # ==========================================
@@ -127,7 +125,7 @@ def scan_single_stock(ticker):
         c_13_3 = (h0['Close'] > h0['SMA_5']) and (h1['Close'] > h1['SMA_5']) and (h2['Close'] > h2['SMA_5'])
         c_13_4 = h0['Value_Trx'] > 5_000_000_000
         c_13_5 = h0['Close'] > h1['Resisten_20']
-        if c_13_1 and c_13_2 and c_13_3 and c_13_4 and c_13_5 and c_13_6:
+        if c_13_1 and c_13_2 and c_13_3 and c_13_4 and c_13_5:
             triggered_strategies.append("V1.3 (Continuation)")
 
         # 4. Sinyal V2.1
@@ -149,7 +147,7 @@ def scan_single_stock(ticker):
         c_mid_3 = (h0['EMA_10'] > h0['EMA_20']) and (h0['EMA_20'] > h0['EMA_50'])
         c_mid_4 = h0['BB_BANDWIDTH'] >= 0.10
         
-        if c_mid_1 and c_mid_2 and c_mid_3 and c_mid_4 and c_mid_5 and c_mid_6:
+        if c_mid_1 and c_mid_2 and c_mid_3 and c_mid_4:
             triggered_strategies.append("BB MID (First Touch Pullback)")
 
         # ==========================================
@@ -161,7 +159,7 @@ def scan_single_stock(ticker):
         c_rev_4 = h0['Value_Trx'] > 1_000_000_000
         c_rev_5 = h0['Volume'] > h1['Volume'] # Volume naik
         
-        if c_rev_1 and c_rev_2 and c_rev_3 and c_rev_4 and c_rev_5 and c_rev_6 and c_rev_7:
+        if c_rev_1 and c_rev_2 and c_rev_3 and c_rev_4 and c_rev_5:
             triggered_strategies.append("BB Reversal (Volume Breakout)")
 
         # Hitung Prev LLV(Low, 5) 
@@ -253,14 +251,14 @@ if st.button("🚀 MULAI PEMINDAIAN SELURUH SAHAM IDX (REAL-TIME)"):
         # Membuat list seluruh strategi unik untuk mapping Tab UI
         all_strategies = [
             "V1.1 (Reversal)",
-            "V1.2 (Pullback SMA 5)",
-            "V1.3 (Breakout Resisten)",
-            "V2.1 (Break SMA5 > 10% + Value > 5B)",
+            "V1.2 (Pullback)",
+            "V1.3 (Breakout Resisten/Continuation)",
+            "V2.1 (Breakout > 10%)",
             "V2.2 (Sideways Breakout + Value > 5B)",
             "BB MID (First Touch Pullback)",
             "BB Reversal (Volume Breakout)",
-            "MA 50 (Pullback Tolerance)",
-            "MA 200 (Pullback Tolerance)"
+            "MA 50 (Pullback)",
+            "MA 200 (Pullback)"
         ]
         
         st.markdown("### 📊 Hasil Berdasarkan Strategi")
