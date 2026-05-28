@@ -125,7 +125,7 @@ def scan_single_stock(ticker):
        
 
         # ==========================================
-        # 3. Magic Screener V1.3 (Saham Super/continuation)
+        # 3. Rumus V1.3 (Saham Super/continuation)
         # ==========================================
         c_13_1 = h0['Volume'] > h1['Volume']
         c_13_2 = h0['Close'] > h1['Close']
@@ -133,16 +133,36 @@ def scan_single_stock(ticker):
         c_13_4 = h0['Value_Trx'] > 5_000_000_000
 
         if c_13_1 and c_13_2 and c_13_3 and c_13_4:
-            triggered_strategies.append("Magic Screener V1.3 (Saham Super/continuation)")
+            triggered_strategies.append("V1.3 (Breakout Resisten/Continuation)")
 
-        # 4. Sinyal V2.1 - SINKRONISASI NAMA
-        if (h1['Close'] < h1['SMA_5']) and (h0['Close'] > h0['SMA_5']) and (((h0['Close'] - h0['SMA_5']) / h0['SMA_5']) * 100 >= 10) and (h0['Value_Trx'] >= 5_000_000_000):
-            triggered_strategies.append("V2.1 (Breakout > 10%)")
+        # ==========================================
+        # 4. Rumus V2.1 (Reversal)
+        # ==========================================
+        c_21_1 = h0['Volume'] > h1['Volume']
+        c_21_2 = h0['Close'] > h1['Close']
+        c_21_3 = h0['Close'] > h0['SMA_5']
+        c_21_4 = h0['Value_Trx'] > 5_000_000_000
+        c_21_5 = (h0['High'] / h1['Close']) >= 1.10
+        c_21_6 = h1['Close'] < h1['SMA_5']
+        c_21_7 = (h0['Close'] - h0['Open']) / h0['Open'] >= 0.10
 
-        # 5. Sinyal V2.2
-        cond_sideways = ((h1['Resisten_20'] - h1['Support_20']) / h1['Support_20']) <= 0.10
-        if cond_sideways and (h1['Close'] < h1['SMA_5']) and (h0['Close'] > h0['SMA_5']) and (((h0['Close'] - h0['SMA_5']) / h0['SMA_5']) * 100 >= 10) and (h0['Value_Trx'] >= 5_000_000_000):
-            triggered_strategies.append("V2.2 (Sideways Breakout + Value > 5B)")
+        if c_21_1 and c_21_2 and c_21_3 and c_21_4 and c_21_5 and c_21_6 and c_21_7:
+            triggered_strategies.append("V2.1 (Reversal)")
+
+        # ==========================================
+        # 5. Rumus V2.2 (Sideways Breakout)
+        # ==========================================
+        c_22_1 = ((h1['Resisten_20'] - h1['Support_20']) / h1['Support_20']) <= 0.15
+        c_22_2 = h0['Close'] > h1['Resisten_20']
+        c_22_3 = (h0['Close'] - h0['SMA_5']) / h0['SMA_5'] >= 0.10
+        c_22_4 = h0['Volume'] > h1['Volume']
+        c_22_5 = h0['Close'] > h1['Close']
+        c_22_6 = h0['Close'] > h0['SMA_5']
+        c_22_7 = h0['Value_Trx'] > 5_000_000_000
+        c_22_8 = (h0['High'] / h1['Close']) >= 1.10
+
+        if c_22_1 and c_22_2 and c_22_3 and c_22_4 and c_22_5 and c_22_6 and c_22_7 and c_22_8:
+            triggered_strategies.append("V2.2 (Sideways Breakout)")
         
         # ==========================================
         # 6. Rumus BB MID (First Touch Pullback)
@@ -240,8 +260,8 @@ if st.button("🚀 MULAI PEMINDAIAN SELURUH SAHAM IDX (REAL-TIME)"):
             "V1.1 (Reversal)",
             "V1.2 (Pullback)",
             "V1.3 (Breakout Resisten/Continuation)",
-            "V2.1 (Breakout > 10%)",
-            "V2.2 (Sideways Breakout + Value > 5B)",
+            "V2.1 (Reversal)",
+            "V2.2 (Sideways Breakout)",
             "BB MID (First Touch Pullback)",
             "BB Reversal (Volume Breakout)",
             "MA 50 (Pullback)",
