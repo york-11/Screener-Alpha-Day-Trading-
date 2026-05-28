@@ -11,7 +11,7 @@ st.markdown("Mesin Pemindai Sinyal Saham Berdasarkan Algoritma Alpha Project")
 
 # --- DAFTAR SELURUH SAHAM IDX ---
 raw_tickers = (
-    "AALI,ABBA,ABDA,ABMM,ACES,ACST,ADCP,ADES,ADHI,ADMF,ADMR,ADRO,AGAR,AGII,AGRO,AHA,AIMS,AISA,AKKU,AKPI,"
+    "AADI,AALI,ABBA,ABDA,ABMM,ACES,ACST,ADCP,ADES,ADHI,ADMF,ADMR,ADRO,AGAR,AGII,AGRO,AHA,AIMS,AISA,AKKU,AKPI,"
     "AKRA,AKSI,ALDO,ALKA,ALMI,ALTO,AMAG,AMAN,AMAR,AMFG,AMIN,AMMN,AMOR,AMRT,ANDI,ANJT,ANTM,APEX,APIC,APII,"
     "APLI,APLN,ARCI,ARGO,ARII,ARKA,ARKO,ARMY,ARNA,ARTA,ARTI,ASBI,ASDM,ASGR,ASHA,ASII,ASJT,ASLC,ASMI,ASPI,"
     "ASRI,ASRM,ASSA,ASTA,ATIC,AUTO,AYLS,BABP,BACA,BAJA,BALI,BAMB,BAPA,BAPI,BATA,BAUT,BAYU,BBCA,BBHI,BBKP,"
@@ -104,7 +104,9 @@ def scan_single_stock(ticker):
         if cond_sideways and (h1['Close'] < h1['SMA_5']) and (h0['Close'] > h0['SMA_5']) and (((h0['Close'] - h0['SMA_5']) / h0['SMA_5']) * 100 >= 10) and (h0['Value_Trx'] >= 5_000_000_000):
             triggered_strategies.append("V2.2 (Sideways Breakout + Value > 5B)")
 
-    # 6. BB Reversal (CUSTOM UPDATE)
+        # ==========================================
+        # 6. BB Reversal (CUSTOM UPDATE)
+        # ==========================================
         # c1 & c2 = Syarat H-1
         c1 = h1['Low'] < h1['BB_LOWER']
         c2 = h1['Close'] < h1['BB_LOWER']
@@ -119,29 +121,50 @@ def scan_single_stock(ticker):
         if c1 and c2 and c3 and c4 and c5 and c6 and c7:
             triggered_strategies.append("BB Reversal (Volume Breakout)")
 
+        # ==========================================
         # 7. BB Mid Pullback
+        # ==========================================
         if (h1['Close'] > h1['Open']) and (h1['Low'] > h1['BB_MID']) and (h0['Close'] < h0['Open']) and (h0['Close'] >= h0['BB_MID']) and (h0['Low'] <= h0['BB_MID'] * 1.02):
             triggered_strategies.append("BB MID (Pullback to Mid Band)")
 
-        # Hitung Prev LLV(Low, 5) menggunakan index iloc 
-        # (mengambil nilai Low terkecil dari 5 baris sebelum baris terakhir/hari ini)
+        # Hitung Prev LLV(Low, 5) 
         prev_llv_low_5 = df['Low'].iloc[-6:-1].min()
 
-        # 8. MA 50 Pullback (CUSTOM UPDATE)
+        # ==========================================
+        # 8. MA 50 Pullback (OPTIMIZED + TREND FILTER)
+        # ==========================================
+        # c1: 5 hari sebelumnya selalu di atas MA 50 (belum pernah nyentuh)
         c_ma50_1 = prev_llv_low_5 > h0['MA_50']
-        c_ma50_2 = (h0['Close'] >= h0['MA_50'] * 0.99) and (h0['Close'] <= h0['MA_50'] * 1.02)
-        c_ma50_3 = h0['Value_Trx'] > 1_000_000_000
         
-        if c_ma50_1 and c_ma50_2 and c_ma50_3:
-            triggered_strategies.append("MA 50 (Pullback Tolerance)")
+        # c2: Garis MA 50 wajib menanjak
+        c_ma50_2 = h0['MA_50'] > h1['MA_50']
+        
+        # c3: Low nyentuh/mendekati MA (maksimal 2%), TAPI Close wajib mantul di atas MA
+        c_ma50_3 = (h0['Low'] <= h0['MA_50'] * 1.02) and (h0['Close'] >= h0['MA_50'])
+        
+        # c4: Likuiditas transaksi hari ini > 1 Miliar
+        c_ma50_4 = h0['Value_Trx'] > 1_000_000_000
 
-        # 9. MA 200 Pullback (NEW)
-        c_ma200_1 = prev_llv_low_5 > h0['MA_200']
-        c_ma200_2 = (h0['Close'] >= h0['MA_200'] * 0.99) and (h0['Close'] <= h0['MA_200'] * 1.02)
-        c_ma200_3 = h0['Value_Trx'] > 1_000_000_000
+        # c5: Filter Tren Utama (MA 50 harus berada di atas MA 200)
+        c_ma50_5 = h0['MA_50'] > h0['MA_200']
         
-        if c_ma200_1 and c_ma200_2 and c_ma200_3:
-            triggered_strategies.append("MA 200 (Pullback Tolerance)")
+        if c_ma50_1 and c_ma50_2 and c_ma50_3 and c_ma50_4 and c_ma50_5:
+            triggered_strategies.append("MA 50 (Optimized Pullback)")
+
+
+        # ==========================================
+        # 9. MA 200 Pullback (OPTIMIZED + TREND FILTER)
+        # ==========================================
+        c_ma200_1 = prev_llv_low_5 > h0['MA_200']
+        c_ma200_2 = h0['MA_200'] > h1['MA_200'] 
+        c_ma200_3 = (h0['Low'] <= h0['MA_200'] * 1.02) and (h0['Close'] >= h0['MA_200'])
+        c_ma200_4 = h0['Value_Trx'] > 1_000_000_000
+        
+        # Filter Tren Utama (MA 50 harus berada di atas MA 200)
+        c_ma200_5 = h0['MA_50'] > h0['MA_200'] 
+        
+        if c_ma200_1 and c_ma200_2 and c_ma200_3 and c_ma200_4 and c_ma200_5:
+            triggered_strategies.append("MA 200 (Optimized Pullback)")
 
         # Jika ada rumus yang terpicu, kembalikan datanya
         if triggered_strategies:
