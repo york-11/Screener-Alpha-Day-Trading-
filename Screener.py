@@ -140,28 +140,45 @@ def scan_single_stock(ticker):
         if cond_sideways and (h1['Close'] < h1['SMA_5']) and (h0['Close'] > h0['SMA_5']) and (((h0['Close'] - h0['SMA_5']) / h0['SMA_5']) * 100 >= 10) and (h0['Value_Trx'] >= 5_000_000_000):
             triggered_strategies.append("V2.2 (Sideways Breakout + Value > 5B)")
 
-        # ==========================================
-        # 6. BB Reversal (CUSTOM UPDATE)
-        # ==========================================
-        # c1 & c2 = Syarat H-1
-        c1 = h1['Low'] < h1['BB_LOWER']
-        c2 = h1['Close'] < h1['BB_LOWER']
+        # Bollinger Bands & EMA (Tambahan)
+        df['BB_UPPER'] = df['BB_MID'] + (2 * df['STD_20'])
+        df['BB_BANDWIDTH'] = (df['BB_UPPER'] - df['BB_LOWER']) / df['BB_MID']
+        df['EMA_10'] = df['Close'].ewm(span=10, adjust=False).mean()
+        df['EMA_20'] = df['Close'].ewm(span=20, adjust=False).mean()
+        df['EMA_50'] = df['Close'].ewm(span=50, adjust=False).mean()
         
-        # c3 sampai c7 = Syarat H-0 (Hari ini)
-        c3 = h0['Close'] > h0['BB_LOWER']
-        c4 = h0['Value_Trx'] > 1_000_000_000
-        c5 = h0['Volume'] > h1['Volume']
-        c6 = h0['High'] > h1['High']
-        c7 = h0['Close'] > h1['Close']
-        
-        if c1 and c2 and c3 and c4 and c5 and c6 and c7:
-            triggered_strategies.append("BB Reversal (Volume Breakout)")
+        # Ambil baris TERAKHIR (h0, h1, h2, dll)
+        # (pastikan kode di atas ditaruh sebelum deklarasi h0, h1, h2...)
 
         # ==========================================
-        # 7. BB Mid Pullback
+        # 6. Sinyal BB MID (First Touch Pullback)
         # ==========================================
-        if (h1['Close'] > h1['Open']) and (h1['Low'] > h1['BB_MID']) and (h0['Close'] < h0['Open']) and (h0['Close'] >= h0['BB_MID']) and (h0['Low'] <= h0['BB_MID'] * 1.02):
-            triggered_strategies.append("BB MID (Pullback to Mid Band)")
+        c_mid_1 = (h0['Close'] > h0['BB_MID']) and (h0['Close'] <= h0['BB_MID'] * 1.02)
+        c_mid_2 = h0['Value_Trx'] > 1_000_000_000
+        # Naik tinggi sebelumnya dipastikan dengan EMA Uptrend & Bandwidth melebar
+        c_mid_3 = (h0['EMA_10'] > h0['EMA_20']) and (h0['EMA_20'] > h0['EMA_50'])
+        c_mid_4 = h0['BB_BANDWIDTH'] >= 0.10
+        # Volume hari ini lebih kecil dari kemarin (Kering)
+        c_mid_5 = h0['Volume'] < h1['Volume']
+        # Sentuhan pertama (H-1 dan H-2 harga Low masih di atas BB_MID)
+        c_mid_6 = (h1['Low'] > h1['BB_MID']) and (h2['Low'] > h2['BB_MID'])
+        
+        if c_mid_1 and c_mid_2 and c_mid_3 and c_mid_4 and c_mid_5 and c_mid_6:
+            triggered_strategies.append("BB MID (First Touch Pullback)")
+
+        # ==========================================
+        # 7. Sinyal BB Reversal (Volume Breakout)
+        # ==========================================
+        c_rev_1 = h1['Low'] < h1['BB_LOWER']
+        c_rev_2 = h1['Close'] < h1['BB_LOWER'] # Candle kemarin ditutup di bawah BB
+        c_rev_3 = h0['Close'] > h0['BB_LOWER'] # Break kembali ke atas BB
+        c_rev_4 = h0['Value_Trx'] > 1_000_000_000
+        c_rev_5 = h0['Volume'] > h1['Volume'] # Volume naik
+        c_rev_6 = h0['High'] > h1['High'] # Higher High
+        c_rev_7 = h0['Close'] > h1['Close'] # Higher Close
+        
+        if c_rev_1 and c_rev_2 and c_rev_3 and c_rev_4 and c_rev_5 and c_rev_6 and c_rev_7:
+            triggered_strategies.append("BB Reversal (Volume Breakout)")
 
         # Hitung Prev LLV(Low, 5) 
         prev_llv_low_5 = df['Low'].iloc[-6:-1].min()
