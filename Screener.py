@@ -11,7 +11,7 @@ st.markdown("Mesin Pemindai Sinyal Saham")
 
 # --- DAFTAR SELURUH SAHAM IDX ---
 raw_tickers = (
-    "AADI,AALI,ABBA,ABDA,ABMM,ACES,ACRO,ACST,ADCP,ADES,ADHI,ADMF,ADMG,ADMR,ADRO,AEGS,AGAR,AGII,AGRO,AGRS,"
+"AADI,AALI,ABBA,ABDA,ABMM,ACES,ACRO,ACST,ADCP,ADES,ADHI,ADMF,ADMG,ADMR,ADRO,AEGS,AGAR,AGII,AGRO,AGRS,"
 "AHAP,AIMS,AISA,AKKU,AKPI,AKRA,AKSI,ALDO,ALII,ALKA,ALMI,ALTO,AMAG,AMAN,AMAR,AMFG,AMIN,AMMN,AMMS,AMOR,"
 "AMRT,ANDI,ANJT,ANTM,APEX,APIC,APII,APLI,APLN,ARCI,AREA,ARGO,ARII,ARKA,ARKO,ARMY,ARNA,ARTA,ARTI,ARTO,"
 "ASBI,ASDM,ASGR,ASHA,ASII,ASJT,ASLC,ASLI,ASMI,ASPI,ASPR,ASRI,ASRM,ASSA,ATAP,ATIC,ATLA,AUTO,AVIA,AWAN,"
@@ -252,7 +252,7 @@ if st.button("🚀 MULAI PEMINDAIAN SELURUH SAHAM IDX (REAL-TIME)"):
         
         # Membuat list seluruh strategi unik untuk mapping Tab UI
         all_strategies = [
-            "V1.1 (SMA 5 Breakout Reversal)",
+            "V1.1 (Reversal)",
             "V1.2 (Pullback SMA 5)",
             "V1.3 (Breakout Resisten)",
             "V2.1 (Break SMA5 > 10% + Value > 5B)",
