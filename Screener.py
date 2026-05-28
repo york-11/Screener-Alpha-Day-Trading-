@@ -105,9 +105,10 @@ def scan_single_stock(ticker):
         # ==========================================
         c_11_1 = h0['Volume'] > h1['Volume']
         c_11_2 = h1['Close'] < h0['Close']
-        c_11_3 = h0['Close'] > h0['SMA_5']
-        c_11_4 = h0['Value_Trx'] > 5_000_000_000
-        if c_11_1 and c_11_2 and c_11_3 and c_11_4:
+        c_11_3 = h1['Close'] < h1['Open']
+        c_11_4 = h0['Close'] > h0['SMA_5']
+        c_11_5 = h0['Value_Trx'] > 5_000_000_000
+        if c_11_1 and c_11_2 and c_11_3 and c_11_4 and c_11_5:
             triggered_strategies.append("V1.1 (Reversal)")
 
         # ==========================================
