@@ -124,16 +124,16 @@ def scan_single_stock(ticker):
             triggered_strategies.append("V1.2 (Pullback)")
        
 
-       # ==========================================
-        # 3. Rumus V1.3 (Continuation)
         # ==========================================
-        c_13_1 = (h2['Close'] > h2['Open']) and (h2['Close'] > h2['SMA_5'])
-        c_13_2 = (h1['Close'] > h1['Open']) and (h1['Close'] > h1['SMA_5'])
-        c_13_3 = (h0['Close'] > h0['Open']) and (h0['Close'] > h0['SMA_5'])
-        c_13_4 = h0['Volume'] > h1['Volume']
+        # 3. Magic Screener V1.3 (Saham Super/continuation)
+        # ==========================================
+        c_13_1 = h0['Volume'] > h1['Volume']
+        c_13_2 = h0['Close'] > h1['Close']
+        c_13_3 = h0['Close'] > h0['SMA_5']
+        c_13_4 = h0['Value_Trx'] > 5_000_000_000
 
         if c_13_1 and c_13_2 and c_13_3 and c_13_4:
-            triggered_strategies.append("V1.3 (Breakout Resisten/Continuation)")
+            triggered_strategies.append("Magic Screener V1.3 (Saham Super/continuation)")
 
         # 4. Sinyal V2.1 - SINKRONISASI NAMA
         if (h1['Close'] < h1['SMA_5']) and (h0['Close'] > h0['SMA_5']) and (((h0['Close'] - h0['SMA_5']) / h0['SMA_5']) * 100 >= 10) and (h0['Value_Trx'] >= 5_000_000_000):
