@@ -65,11 +65,10 @@ idx_tickers = sorted(list(set(raw_tickers.split(','))))
 # --- ENGINE SCREENER UNTUK SATU SAHAM ---
 def scan_single_stock(ticker):
     try:
-        # Kita ambil data 250 hari terakhir (~1 tahun) untuk menghitung MA 200 dengan aman
         stock = yf.Ticker(f"{ticker}.JK")
         df = stock.history(period="1y")
         
-        if df.empty or len(df) < 20: # Skip jika data tidak lengkap
+        if df.empty or len(df) < 200: # Diubah ke 200 karena kita butuh kalkulasi MA 200
             return None
         
         df.index = df.index.tz_localize(None)
@@ -82,13 +81,18 @@ def scan_single_stock(ticker):
         df['MA_50'] = df['Close'].rolling(window=50).mean()
         df['MA_200'] = df['Close'].rolling(window=200).mean()
         
-        # Bollinger Bands
+        # Bollinger Bands & EMA Tambahan (DIPERBAIKI DI SINI)
         df['BB_MID'] = df['Close'].rolling(window=20).mean()
         df['STD_20'] = df['Close'].rolling(window=20).std()
         df['BB_LOWER'] = df['BB_MID'] - (2 * df['STD_20'])
+        df['BB_UPPER'] = df['BB_MID'] + (2 * df['STD_20'])
+        df['BB_BANDWIDTH'] = (df['BB_UPPER'] - df['BB_LOWER']) / df['BB_MID']
+        
+        df['EMA_10'] = df['Close'].ewm(span=10, adjust=False).mean()
+        df['EMA_20'] = df['Close'].ewm(span=20, adjust=False).mean()
+        df['EMA_50'] = df['Close'].ewm(span=50, adjust=False).mean()
 
-        # Ambil baris TERAKHIR (Hari ini / Hari Bursa Terakhir)
-        # Serta baris-baris sebelumnya untuk logika H-1, H-2, dst.
+        # Ambil baris TERAKHIR 
         h0 = df.iloc[-1]
         h1 = df.iloc[-2]
         h2 = df.iloc[-3]
@@ -118,7 +122,7 @@ def scan_single_stock(ticker):
             triggered_strategies.append("V1.2 (Pullback)")
 
         # ==========================================
-        # 3. Rumus V1.3 (Continuation/Breakout Resistance)
+        # 3. Rumus V1.3 (Continuation) - SINKRONISASI NAMA
         # ==========================================
         c_13_1 = h0['Volume'] > h1['Volume']
         c_13_2 = h1['Close'] < h0['Close']
@@ -126,24 +130,22 @@ def scan_single_stock(ticker):
         c_13_4 = h0['Value_Trx'] > 5_000_000_000
         c_13_5 = h0['Close'] > h1['Resisten_20']
         if c_13_1 and c_13_2 and c_13_3 and c_13_4 and c_13_5:
-            triggered_strategies.append("V1.3 (Continuation)")
+            triggered_strategies.append("V1.3 (Breakout Resisten/Continuation)")
 
-        # 4. Sinyal V2.1
+        # 4. Sinyal V2.1 - SINKRONISASI NAMA
         if (h1['Close'] < h1['SMA_5']) and (h0['Close'] > h0['SMA_5']) and (((h0['Close'] - h0['SMA_5']) / h0['SMA_5']) * 100 >= 10) and (h0['Value_Trx'] >= 5_000_000_000):
-            triggered_strategies.append("V2.1 (Break SMA5 > 10% + Value > 5B)")
+            triggered_strategies.append("V2.1 (Breakout > 10%)")
 
         # 5. Sinyal V2.2
         cond_sideways = ((h1['Resisten_20'] - h1['Support_20']) / h1['Support_20']) <= 0.10
         if cond_sideways and (h1['Close'] < h1['SMA_5']) and (h0['Close'] > h0['SMA_5']) and (((h0['Close'] - h0['SMA_5']) / h0['SMA_5']) * 100 >= 10) and (h0['Value_Trx'] >= 5_000_000_000):
             triggered_strategies.append("V2.2 (Sideways Breakout + Value > 5B)")
         
-
         # ==========================================
         # 6. Rumus BB MID (First Touch Pullback)
         # ==========================================
         c_mid_1 = (h0['Close'] > h0['BB_MID']) and (h0['Close'] <= h0['BB_MID'] * 1.02)
         c_mid_2 = h0['Value_Trx'] > 1_000_000_000
-        # Naik tinggi sebelumnya dipastikan dengan EMA Uptrend & Bandwidth melebar
         c_mid_3 = (h0['EMA_10'] > h0['EMA_20']) and (h0['EMA_20'] > h0['EMA_50'])
         c_mid_4 = h0['BB_BANDWIDTH'] >= 0.10
         
@@ -154,10 +156,10 @@ def scan_single_stock(ticker):
         # 7. Rumus BB Reversal (Volume Breakout)
         # ==========================================
         c_rev_1 = h1['Low'] < h1['BB_LOWER']
-        c_rev_2 = h1['Close'] < h1['BB_LOWER'] # Candle kemarin ditutup di bawah BB
-        c_rev_3 = h0['Close'] > h0['BB_LOWER'] # Break kembali ke atas BB
+        c_rev_2 = h1['Close'] < h1['BB_LOWER']
+        c_rev_3 = h0['Close'] > h0['BB_LOWER']
         c_rev_4 = h0['Value_Trx'] > 1_000_000_000
-        c_rev_5 = h0['Volume'] > h1['Volume'] # Volume naik
+        c_rev_5 = h0['Volume'] > h1['Volume']
         
         if c_rev_1 and c_rev_2 and c_rev_3 and c_rev_4 and c_rev_5:
             triggered_strategies.append("BB Reversal (Volume Breakout)")
@@ -166,42 +168,29 @@ def scan_single_stock(ticker):
         prev_llv_low_5 = df['Low'].iloc[-6:-1].min()
 
         # ==========================================
-        # 8. MA 50 Pullback (OPTIMIZED + TREND FILTER)
+        # 8. MA 50 Pullback - SINKRONISASI NAMA
         # ==========================================
-        # c1: 5 hari sebelumnya selalu di atas MA 50 (belum pernah nyentuh)
         c_ma50_1 = prev_llv_low_5 > h0['MA_50']
-        
-        # c2: Garis MA 50 wajib menanjak
         c_ma50_2 = h0['MA_50'] > h1['MA_50']
-        
-        # c3: Low nyentuh/mendekati MA (maksimal 2%), TAPI Close wajib mantul di atas MA
         c_ma50_3 = (h0['Low'] <= h0['MA_50'] * 1.02) and (h0['Close'] >= h0['MA_50'])
-        
-        # c4: Likuiditas transaksi hari ini > 1 Miliar
         c_ma50_4 = h0['Value_Trx'] > 1_000_000_000
-
-        # c5: Filter Tren Utama (MA 50 harus berada di atas MA 200)
         c_ma50_5 = h0['MA_50'] > h0['MA_200']
         
         if c_ma50_1 and c_ma50_2 and c_ma50_3 and c_ma50_4 and c_ma50_5:
-            triggered_strategies.append("MA 50 (Optimized Pullback)")
-
+            triggered_strategies.append("MA 50 (Pullback)")
 
         # ==========================================
-        # 9. MA 200 Pullback (OPTIMIZED + TREND FILTER)
+        # 9. MA 200 Pullback - SINKRONISASI NAMA
         # ==========================================
         c_ma200_1 = prev_llv_low_5 > h0['MA_200']
         c_ma200_2 = h0['MA_200'] > h1['MA_200'] 
         c_ma200_3 = (h0['Low'] <= h0['MA_200'] * 1.02) and (h0['Close'] >= h0['MA_200'])
         c_ma200_4 = h0['Value_Trx'] > 1_000_000_000
-        
-        # Filter Tren Utama (MA 50 harus berada di atas MA 200)
         c_ma200_5 = h0['MA_50'] > h0['MA_200'] 
         
         if c_ma200_1 and c_ma200_2 and c_ma200_3 and c_ma200_4 and c_ma200_5:
-            triggered_strategies.append("MA 200 (Optimized Pullback)")
+            triggered_strategies.append("MA 200 (Pullback)")
 
-        # Jika ada rumus yang terpicu, kembalikan datanya
         if triggered_strategies:
             return {
                 "Ticker": ticker,
@@ -215,9 +204,8 @@ def scan_single_stock(ticker):
 
 # --- UI DAN LOGIKA UTAMA ---
 st.sidebar.header("⚙️ Kontrol Pemindai")
-max_workers = st.sidebar.slider("Kecepatan Scan (Threads)", 5, 30, 15, help="Semakin tinggi semakin cepat, tapi rentan diblokir Yahoo Finance jika terlalu tinggi.")
+max_workers = st.sidebar.slider("Kecepatan Scan (Threads)", 5, 30, 15, help="Semakin tinggi semakin cepat.")
 
-# Tombol Utama
 if st.button("🚀 MULAI PEMINDAIAN SELURUH SAHAM IDX (REAL-TIME)"):
     progress_bar = st.progress(0)
     status_text = st.empty()
@@ -227,7 +215,6 @@ if st.button("🚀 MULAI PEMINDAIAN SELURUH SAHAM IDX (REAL-TIME)"):
     
     status_text.markdown(f"**Memulai pemindaian paralel untuk {total_saham} saham...**")
     
-    # Menggunakan ThreadPoolExecutor untuk Multithreading agar super cepat
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {executor.submit(scan_single_stock, ticker): ticker for ticker in idx_tickers}
         
@@ -236,7 +223,6 @@ if st.button("🚀 MULAI PEMINDAIAN SELURUH SAHAM IDX (REAL-TIME)"):
             if res:
                 results.append(res)
             
-            # Update Progress Bar
             progress = (i + 1) / total_saham
             progress_bar.progress(progress)
             if i % 20 == 0:
@@ -245,10 +231,8 @@ if st.button("🚀 MULAI PEMINDAIAN SELURUH SAHAM IDX (REAL-TIME)"):
     status_text.success(f"🎉 Pemindaian Selesai! Menemukan {len(results)} saham potensial hari ini.")
     
     if results:
-        # Ubah list hasil menjadi DataFrame rapi
         df_all = pd.DataFrame(results)
         
-        # Membuat list seluruh strategi unik untuk mapping Tab UI
         all_strategies = [
             "V1.1 (Reversal)",
             "V1.2 (Pullback)",
@@ -262,24 +246,19 @@ if st.button("🚀 MULAI PEMINDAIAN SELURUH SAHAM IDX (REAL-TIME)"):
         ]
         
         st.markdown("### 📊 Hasil Berdasarkan Strategi")
-        
-        # Buat Tabs dinamis di Streamlit agar UI/UX bersih dan rapi
         tabs = st.tabs(all_strategies)
         
         for idx, strat in enumerate(all_strategies):
             with tabs[idx]:
-                # Filter saham yang mengandung strategi spesifik ini
                 filtered_df = df_all[df_all['Strategies'].apply(lambda x: strat in x)].copy()
                 
                 if filtered_df.empty:
                     st.info(f"Tidak ada saham yang memicu rumus **{strat}** pada hari ini.")
                 else:
-                    # Rapikan tampilan tabel
                     display_df = filtered_df[["Ticker", "Price", "Value (Billion)"]]
                     st.subheader(f"📈 {len(display_df)} Saham terdeteksi masuk radar:")
                     st.dataframe(display_df, use_container_width=True)
                     
-                    # Tambah Tombol Download CSV per Strategi
                     csv = display_df.to_csv(index=False).encode('utf-8')
                     st.download_button(
                         label=f"📥 Download Daftar {strat}",
