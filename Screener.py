@@ -103,7 +103,6 @@ def scan_single_stock(ticker):
         c_11_2 = h1['Close'] < h0['Close']
         c_11_3 = h0['Close'] > h0['SMA_5']
         c_11_4 = h0['Value_Trx'] > 5_000_000_000
-        c_11_5 = h0['MA_50'] > h0['MA_200']
         if c_11_1 and c_11_2 and c_11_3 and c_11_4 and c_11_5:
             triggered_strategies.append("V1.1 (Reversal)")
 
@@ -115,7 +114,6 @@ def scan_single_stock(ticker):
         c_12_3 = h1['Close'] < h2['Close']
         c_12_4 = h0['Close'] < h1['Close']
         c_12_5 = h0['Value_Trx'] > 1_000_000_000
-        c_12_6 = h0['MA_50'] > h0['MA_200']
         if c_12_1 and c_12_2 and c_12_3 and c_12_4 and c_12_5 and c_12_6:
             triggered_strategies.append("V1.2 (Pullback)")
 
@@ -151,15 +149,13 @@ def scan_single_stock(ticker):
         # (pastikan kode di atas ditaruh sebelum deklarasi h0, h1, h2...)
 
         # ==========================================
-        # 6. Sinyal BB MID (First Touch Pullback)
+        # 6. Rumus BB MID (First Touch Pullback)
         # ==========================================
         c_mid_1 = (h0['Close'] > h0['BB_MID']) and (h0['Close'] <= h0['BB_MID'] * 1.02)
         c_mid_2 = h0['Value_Trx'] > 1_000_000_000
         # Naik tinggi sebelumnya dipastikan dengan EMA Uptrend & Bandwidth melebar
         c_mid_3 = (h0['EMA_10'] > h0['EMA_20']) and (h0['EMA_20'] > h0['EMA_50'])
         c_mid_4 = h0['BB_BANDWIDTH'] >= 0.10
-        # Volume hari ini lebih kecil dari kemarin (Kering)
-        c_mid_5 = h0['Volume'] < h1['Volume']
         # Sentuhan pertama (H-1 dan H-2 harga Low masih di atas BB_MID)
         c_mid_6 = (h1['Low'] > h1['BB_MID']) and (h2['Low'] > h2['BB_MID'])
         
@@ -167,15 +163,13 @@ def scan_single_stock(ticker):
             triggered_strategies.append("BB MID (First Touch Pullback)")
 
         # ==========================================
-        # 7. Sinyal BB Reversal (Volume Breakout)
+        # 7. Rumus BB Reversal (Volume Breakout)
         # ==========================================
         c_rev_1 = h1['Low'] < h1['BB_LOWER']
         c_rev_2 = h1['Close'] < h1['BB_LOWER'] # Candle kemarin ditutup di bawah BB
         c_rev_3 = h0['Close'] > h0['BB_LOWER'] # Break kembali ke atas BB
         c_rev_4 = h0['Value_Trx'] > 1_000_000_000
         c_rev_5 = h0['Volume'] > h1['Volume'] # Volume naik
-        c_rev_6 = h0['High'] > h1['High'] # Higher High
-        c_rev_7 = h0['Close'] > h1['Close'] # Higher Close
         
         if c_rev_1 and c_rev_2 and c_rev_3 and c_rev_4 and c_rev_5 and c_rev_6 and c_rev_7:
             triggered_strategies.append("BB Reversal (Volume Breakout)")
