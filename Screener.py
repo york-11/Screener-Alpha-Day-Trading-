@@ -273,8 +273,8 @@ if st.button("🚀 MULAI PEMINDAIAN SELURUH SAHAM IDX (REAL-TIME)"):
             "V1.3 (Breakout Resisten)",
             "V2.1 (Break SMA5 > 10% + Value > 5B)",
             "V2.2 (Sideways Breakout + Value > 5B)",
+            "BB MID (First Touch Pullback)",
             "BB Reversal (Volume Breakout)",
-            "BB MID (Pullback to Mid Band)",
             "MA 50 (Pullback Tolerance)",
             "MA 200 (Pullback Tolerance)"
         ]
