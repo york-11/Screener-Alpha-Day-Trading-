@@ -105,7 +105,7 @@ def scan_single_stock(ticker):
         c_11_4 = h0['Value_Trx'] > 5_000_000_000
         c_11_5 = h0['MA_50'] > h0['MA_200']
         if c_11_1 and c_11_2 and c_11_3 and c_11_4 and c_11_5:
-            triggered_strategies.append("V1.1 (Magic Reversal)")
+            triggered_strategies.append("V1.1 (Reversal)")
 
         # ==========================================
         # 2. Rumus V1.2 (Pullback)
@@ -117,7 +117,7 @@ def scan_single_stock(ticker):
         c_12_5 = h0['Value_Trx'] > 1_000_000_000
         c_12_6 = h0['MA_50'] > h0['MA_200']
         if c_12_1 and c_12_2 and c_12_3 and c_12_4 and c_12_5 and c_12_6:
-            triggered_strategies.append("V1.2 (Magic Pullback)")
+            triggered_strategies.append("V1.2 (Pullback)")
 
         # ==========================================
         # 3. Rumus V1.3 (Continuation/Breakout Resistance)
@@ -129,7 +129,7 @@ def scan_single_stock(ticker):
         c_13_5 = h0['Close'] > h1['Resisten_20']
         c_13_6 = h0['MA_50'] > h0['MA_200']
         if c_13_1 and c_13_2 and c_13_3 and c_13_4 and c_13_5 and c_13_6:
-            triggered_strategies.append("V1.3 (Magic Continuation)")
+            triggered_strategies.append("V1.3 (Continuation)")
 
         # 4. Sinyal V2.1
         if (h1['Close'] < h1['SMA_5']) and (h0['Close'] > h0['SMA_5']) and (((h0['Close'] - h0['SMA_5']) / h0['SMA_5']) * 100 >= 10) and (h0['Value_Trx'] >= 5_000_000_000):
