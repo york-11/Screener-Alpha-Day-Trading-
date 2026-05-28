@@ -173,19 +173,21 @@ def scan_single_stock(ticker):
         c_mid_4 = h0['BB_BANDWIDTH'] >= 0.10
         
         if c_mid_1 and c_mid_2 and c_mid_3 and c_mid_4:
-            triggered_strategies.append("BB MID (First Touch Pullback)")
+            triggered_strategies.append("Bollinger Bands MID")
 
         # ==========================================
-        # 7. Rumus BB Reversal (Volume Breakout)
+        # 7. Bollinger Bands Reversal
         # ==========================================
-        c_rev_1 = h1['Low'] < h1['BB_LOWER']
-        c_rev_2 = h1['Close'] < h1['BB_LOWER']
-        c_rev_3 = h0['Close'] > h0['BB_LOWER']
-        c_rev_4 = h0['Value_Trx'] > 1_000_000_000
-        c_rev_5 = h0['Volume'] > h1['Volume']
-        
-        if c_rev_1 and c_rev_2 and c_rev_3 and c_rev_4 and c_rev_5:
-            triggered_strategies.append("BB Reversal (Volume Breakout)")
+        c_bb_1 = h1['Low'] < h1['BB_Lower']
+        c_bb_2 = h1['Close'] < h1['BB_Lower']
+        c_bb_3 = h0['Close'] > h0['BB_Lower']
+        c_bb_4 = h0['Value_Trx'] > 1_000_000_000
+        c_bb_5 = h0['Volume'] > h1['Volume']
+        c_bb_6 = h0['High'] > h1['High']
+        c_bb_7 = h0['Close'] > h1['Close']
+
+        if c_bb_1 and c_bb_2 and c_bb_3 and c_bb_4 and c_bb_5 and c_bb_6 and c_bb_7:
+            triggered_strategies.append("BB Reversal")
 
         # Hitung Prev LLV(Low, 5) 
         prev_llv_low_5 = df['Low'].iloc[-6:-1].min()
@@ -262,8 +264,8 @@ if st.button("🚀 MULAI PEMINDAIAN SELURUH SAHAM IDX (REAL-TIME)"):
             "V1.3 (Breakout Resisten/Continuation)",
             "V2.1 (Reversal)",
             "V2.2 (Sideways Breakout)",
-            "BB MID (First Touch Pullback)",
-            "BB Reversal (Volume Breakout)",
+            "Bollinger Bands MID",
+            "Bollinger Bands Reversal",
             "MA 50 (Pullback)",
             "MA 200 (Pullback)"
         ]
