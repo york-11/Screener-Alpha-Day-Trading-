@@ -104,7 +104,7 @@ def scan_single_stock(ticker):
         # 1. Rumus V1.1 (Reversal)
         # ==========================================
         c_11_1 = h0['Volume'] > h1['Volume']
-        c_11_2 = h1['Close'] < h0['Close']
+        c_11_2 = h1['Close'] < h1['SMA_5']
         c_11_3 = h1['Close'] < h1['Open']
         c_11_4 = h0['Close'] > h0['SMA_5']
         c_11_5 = h0['Value_Trx'] > 5_000_000_000
@@ -124,15 +124,15 @@ def scan_single_stock(ticker):
             triggered_strategies.append("V1.2 (Pullback)")
        
 
-        # ==========================================
+       # ==========================================
         # 3. Rumus V1.3 (Continuation)
         # ==========================================
-        c_13_1 = h0['Volume'] > h1['Volume']
-        c_13_2 = h1['Close'] < h0['Close']
-        c_13_3 = (h0['Close'] > h0['SMA_5']) and (h1['Close'] > h1['SMA_5']) and (h2['Close'] > h2['SMA_5'])
-        c_13_4 = h0['Value_Trx'] > 5_000_000_000
-        c_13_5 = h0['Close'] > h1['Resisten_20']
-        if c_13_1 and c_13_2 and c_13_3 and c_13_4 and c_13_5:
+        c_13_1 = (h2['Close'] > h2['Open']) and (h2['Close'] > h2['SMA_5'])
+        c_13_2 = (h1['Close'] > h1['Open']) and (h1['Close'] > h1['SMA_5'])
+        c_13_3 = (h0['Close'] > h0['Open']) and (h0['Close'] > h0['SMA_5'])
+        c_13_4 = h0['Volume'] > h1['Volume']
+
+        if c_13_1 and c_13_2 and c_13_3 and c_13_4:
             triggered_strategies.append("V1.3 (Breakout Resisten/Continuation)")
 
         # 4. Sinyal V2.1 - SINKRONISASI NAMA
