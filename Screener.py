@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 # --- KONFIGURASI DASHBOARD ---
 st.set_page_config(page_title="IDX Stock Screener", layout="wide")
 st.title("🔍 IDX Quantitative Stock Screener V3.0")
-st.markdown("Mesin Pemindai Sinyal Saham Berdasarkan Algoritma Alpha Project")
+st.markdown("Mesin Pemindai Sinyal Saham")
 
 # --- DAFTAR SELURUH SAHAM IDX ---
 raw_tickers = (
@@ -82,10 +82,12 @@ def scan_single_stock(ticker):
         df['MA_50'] = df['Close'].rolling(window=50).mean()
         df['MA_200'] = df['Close'].rolling(window=200).mean()
         
-        # Bollinger Bands
-        df['BB_MID'] = df['Close'].rolling(window=20).mean()
-        df['STD_20'] = df['Close'].rolling(window=20).std()
-        df['BB_LOWER'] = df['BB_MID'] - (2 * df['STD_20'])
+        # Tambahan Indikator untuk BB MID
+        df['EMA_10'] = df['Close'].ewm(span=10, adjust=False).mean()
+        df['EMA_20'] = df['Close'].ewm(span=20, adjust=False).mean()
+        df['EMA_50'] = df['Close'].ewm(span=50, adjust=False).mean()
+        df['BB_UPPER'] = df['BB_MID'] + (2 * df['STD_20'])
+        df['BB_BANDWIDTH'] = (df['BB_UPPER'] - df['BB_LOWER']) / df['BB_MID']
 
         # Ambil baris TERAKHIR (Hari ini / Hari Bursa Terakhir)
         # Serta baris-baris sebelumnya untuk logika H-1, H-2, dst.
@@ -125,7 +127,6 @@ def scan_single_stock(ticker):
         c_13_3 = (h0['Close'] > h0['SMA_5']) and (h1['Close'] > h1['SMA_5']) and (h2['Close'] > h2['SMA_5'])
         c_13_4 = h0['Value_Trx'] > 5_000_000_000
         c_13_5 = h0['Close'] > h1['Resisten_20']
-        c_13_6 = h0['MA_50'] > h0['MA_200']
         if c_13_1 and c_13_2 and c_13_3 and c_13_4 and c_13_5 and c_13_6:
             triggered_strategies.append("V1.3 (Continuation)")
 
@@ -137,16 +138,7 @@ def scan_single_stock(ticker):
         cond_sideways = ((h1['Resisten_20'] - h1['Support_20']) / h1['Support_20']) <= 0.10
         if cond_sideways and (h1['Close'] < h1['SMA_5']) and (h0['Close'] > h0['SMA_5']) and (((h0['Close'] - h0['SMA_5']) / h0['SMA_5']) * 100 >= 10) and (h0['Value_Trx'] >= 5_000_000_000):
             triggered_strategies.append("V2.2 (Sideways Breakout + Value > 5B)")
-
-        # Bollinger Bands & EMA (Tambahan)
-        df['BB_UPPER'] = df['BB_MID'] + (2 * df['STD_20'])
-        df['BB_BANDWIDTH'] = (df['BB_UPPER'] - df['BB_LOWER']) / df['BB_MID']
-        df['EMA_10'] = df['Close'].ewm(span=10, adjust=False).mean()
-        df['EMA_20'] = df['Close'].ewm(span=20, adjust=False).mean()
-        df['EMA_50'] = df['Close'].ewm(span=50, adjust=False).mean()
         
-        # Ambil baris TERAKHIR (h0, h1, h2, dll)
-        # (pastikan kode di atas ditaruh sebelum deklarasi h0, h1, h2...)
 
         # ==========================================
         # 6. Rumus BB MID (First Touch Pullback)
@@ -156,8 +148,6 @@ def scan_single_stock(ticker):
         # Naik tinggi sebelumnya dipastikan dengan EMA Uptrend & Bandwidth melebar
         c_mid_3 = (h0['EMA_10'] > h0['EMA_20']) and (h0['EMA_20'] > h0['EMA_50'])
         c_mid_4 = h0['BB_BANDWIDTH'] >= 0.10
-        # Sentuhan pertama (H-1 dan H-2 harga Low masih di atas BB_MID)
-        c_mid_6 = (h1['Low'] > h1['BB_MID']) and (h2['Low'] > h2['BB_MID'])
         
         if c_mid_1 and c_mid_2 and c_mid_3 and c_mid_4 and c_mid_5 and c_mid_6:
             triggered_strategies.append("BB MID (First Touch Pullback)")
