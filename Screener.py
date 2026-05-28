@@ -114,16 +114,18 @@ def scan_single_stock(ticker):
         # ==========================================
         # 2. Rumus V1.2 (Pullback)
         # ==========================================
-        c_12_1 = (h0['Close'] > h0['SMA_5']) and (h1['Close'] > h1['SMA_5']) and (h2['Close'] > h2['SMA_5'])
-        c_12_2 = (h2['High'] / h3['Close']) >= 1.1
-        c_12_3 = h1['Close'] < h2['Close']
-        c_12_4 = h0['Close'] < h1['Close']
+        c_12_1 = h1['High'] > (h1['SMA_5'] * 1.10)
+        c_12_2 = h1['Close'] >= h1['Open']
+        c_12_3 = (h0['Close'] >= h0['SMA_5']) and (h0['Close'] <= h0['SMA_5'] * 1.05)
+        c_12_4 = h0['Open'] > h0['Close']
         c_12_5 = h0['Value_Trx'] > 1_000_000_000
+
         if c_12_1 and c_12_2 and c_12_3 and c_12_4 and c_12_5:
             triggered_strategies.append("V1.2 (Pullback)")
+       
 
         # ==========================================
-        # 3. Rumus V1.3 (Continuation) - SINKRONISASI NAMA
+        # 3. Rumus V1.3 (Continuation)
         # ==========================================
         c_13_1 = h0['Volume'] > h1['Volume']
         c_13_2 = h1['Close'] < h0['Close']
