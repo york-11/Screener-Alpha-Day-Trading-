@@ -176,7 +176,6 @@ def scan_single_stock(ticker: str) -> dict | None:
             and (h1['Close'] < h0['Close'])
             and (h0['Close'] > h0['MA_5'])
             and (h0['Value_Trx'] >= 5_000_000_000)
-            and (h1['Close'] < h1['Open'])
             and (h1['Close'] < h1['MA_5'])
             and (h0['Close'] > h0['Open'])
         )
