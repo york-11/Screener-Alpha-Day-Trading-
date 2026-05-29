@@ -79,7 +79,7 @@ def scan_single_stock(ticker: str) -> dict | None:
         # ----------------------------------------------------------
         # INDIKATOR
         # ----------------------------------------------------------
-        df['SMA_5']       = df['Close'].rolling(5).mean()
+        df['MA_5']       = df['Close'].rolling(5).mean()
         df['MA_50']       = df['Close'].rolling(50).mean()
         df['MA_200']      = df['Close'].rolling(200).mean()
         df['Value_Trx']   = df['Close'] * df['Volume']
@@ -118,9 +118,9 @@ def scan_single_stock(ticker: str) -> dict | None:
         # ==========================================
         c_v11 = (
             (h1['Close'] < h1['Open'])          # H-1 merah
-            and (h1['Close'] < h1['SMA_5'])     # H-1 di bawah SMA5
+            and (h1['Close'] < h1['MA_5'])     # H-1 di bawah SMA5
             and (h0['Close'] > h0['Open'])       # H-0 hijau
-            and (h0['Close'] > h0['SMA_5'])      # H-0 di atas SMA5
+            and (h0['Close'] > h0['MA_5'])      # H-0 di atas SMA5
             and (h0['Value_Trx'] >= 1_000_000_000)
         )
         if c_v11:
