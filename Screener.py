@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # --- KONFIGURASI DASHBOARD ---
 st.set_page_config(page_title="IDX Stock Screener", layout="wide")
 st.title("🔍 IDX Quantitative Stock Screener V4.0")
-st.markdown("Mesin Pemindai Sinyal Saham — Sinkron dengan Backtester V2.1")
+st.markdown("Mesin Pemindai Sinyal Saham — Sinkron dengan Parameter Day Trading Yang Mulia")
 
 # --- DAFTAR SELURUH SAHAM IDX ---
 raw_tickers = (
@@ -64,8 +64,7 @@ idx_tickers = sorted(list(set(t for t in raw_tickers.split(',') if t.strip())))
 
 
 # ============================================================
-# ENGINE: SCAN SATU SAHAM
-# Logika kondisi SINKRON 100% dengan Backtester V2.1
+# ENGINE: SCAN SATU SAHAM (SINKRONISASI TOTAL)
 # ============================================================
 def scan_single_stock(ticker: str) -> dict | None:
     try:
@@ -77,9 +76,9 @@ def scan_single_stock(ticker: str) -> dict | None:
         df.index = df.index.tz_localize(None)
 
         # ----------------------------------------------------------
-        # INDIKATOR
+        # KALKULASI INDIKATOR KUNCI
         # ----------------------------------------------------------
-        df['MA_5']       = df['Close'].rolling(5).mean()
+        df['MA_5']        = df['Close'].rolling(5).mean()
         df['MA_50']       = df['Close'].rolling(50).mean()
         df['MA_200']      = df['Close'].rolling(200).mean()
         df['Value_Trx']   = df['Close'] * df['Volume']
@@ -93,173 +92,162 @@ def scan_single_stock(ticker: str) -> dict | None:
         df['BB_LOWER'] = df['BB_MID'] - 2 * df['BB_STD']
         df['BB_BW']    = (df['BB_UPPER'] - df['BB_LOWER']) / df['BB_MID']
 
-        # EMA untuk filter BB MID
+        # EMA Filter
         df['EMA_10'] = df['Close'].ewm(span=10, adjust=False).mean()
         df['EMA_20'] = df['Close'].ewm(span=20, adjust=False).mean()
         df['EMA_50'] = df['Close'].ewm(span=50, adjust=False).mean()
 
-        # LLV: low minimum 5 candle sebelumnya (tidak termasuk hari ini)
-        # shift(1) dulu baru rolling(5) → identik dengan backtester
+        # LLV Kunci (H-1 ke belakang)
         df['LLV_5'] = df['Low'].shift(1).rolling(5).min()
 
-        # Ambil baris terakhir yang lengkap datanya
-        h0 = df.iloc[-1]   # hari ini  (H-0)
-        h1 = df.iloc[-2]   # kemarin   (H-1)
-        h2 = df.iloc[-3]   # 2 hari lalu (H-2)
-        h3 = df.iloc[-4]   # 3 hari lalu (H-3)
-        h4 = df.iloc[-5]   # 4 hari lalu (H-4)
+        # Ekstraksi Baris Candle (H-0 s.d H-3)
+        h0 = df.iloc[-1]   # Hari ini
+        h1 = df.iloc[-2]   # Kemarin
+        h2 = df.iloc[-3]   # 2 Hari lalu
+        h3 = df.iloc[-4]   # 3 Hari lalu
 
         triggered = []
 
         # ==========================================
-        # V1.1 — SMA5 Breakout Reversal
-        # H-1: candle merah + di bawah SMA5
-        # H-0: candle hijau + di atas SMA5 + value ≥ 1B
+        # MA 50 (Pullback)
         # ==========================================
-        c_v11 = (
-            (h1['Close'] < h1['Open'])          # H-1 merah
-            and (h1['Close'] < h1['MA_5'])     # H-1 di bawah SMA5
-            and (h0['Close'] > h0['Open'])       # H-0 hijau
-            and (h0['Close'] > h0['MA_5'])      # H-0 di atas SMA5
-            and (h0['Value_Trx'] >= 1_000_000_000)
-        )
-        if c_v11:
-            triggered.append("V1.1 (Reversal)")
-
-        # ==========================================
-        # V1.2 — Pullback ke SMA5
-        # H-2: high spike ≥ 10% dari close H-3
-        # H-1: close di atas SMA5
-        # H-0: candle merah, close mendekati SMA5 (±5%)
-        # ==========================================
-        c_v12 = (
-            (h2['High'] / h3['Close'] >= 1.10)              # H-2 spike tinggi
-            and (h1['Close'] > h1['SMA_5'])                  # H-1 di atas SMA5
-            and (h0['Close'] < h0['Open'])                   # H-0 merah
-            and (h0['Close'] >= h0['SMA_5'] * 0.98)         # H-0 tidak terlalu jauh di bawah SMA5
-            and (h0['Close'] <= h0['SMA_5'] * 1.05)         # H-0 masih dekat SMA5
-            and (h0['Value_Trx'] >= 1_000_000_000)
-        )
-        if c_v12:
-            triggered.append("V1.2 (Pullback)")
-
-        # ==========================================
-        # V1.3 — Continuation / Break Resisten
-        # H-3, H-2, H-1: tiga candle hijau berturut di atas SMA5
-        # H-0: close > resisten 20 hari (shift 1 = resisten kemarin)
-        # ==========================================
-        c_v13 = (
-            (h1['Close'] > h1['Open']) and (h1['Close'] > h1['SMA_5'])   # H-1 hijau
-            and (h2['Close'] > h2['Open']) and (h2['Close'] > h2['SMA_5'])  # H-2 hijau
-            and (h3['Close'] > h3['Open']) and (h3['Close'] > h3['SMA_5'])  # H-3 hijau
-            and (h0['Close'] > h1['Resisten_20'])                          # H-0 break resisten kemarin
-            and (h0['Value_Trx'] >= 1_000_000_000)
-        )
-        if c_v13:
-            triggered.append("V1.3 (Breakout Resisten/Continuation)")
-
-        # ==========================================
-        # V2.1 — Reversal Break SMA5 ≥10% + Value >5B
-        # H-1: close di bawah SMA5
-        # H-0: close di atas SMA5 + (close - SMA5) / SMA5 ≥ 10%
-        # ==========================================
-        c_v21 = (
-            (h1['Close'] < h1['SMA_5'])                                      # H-1 di bawah SMA5
-            and (h0['Close'] > h0['SMA_5'])                                  # H-0 di atas SMA5
-            and ((h0['Close'] - h0['SMA_5']) / h0['SMA_5'] >= 0.10)        # gap ≥ 10%
-            and (h0['Value_Trx'] >= 5_000_000_000)
-        )
-        if c_v21:
-            triggered.append("V2.1 (Reversal)")
-
-        # ==========================================
-        # V2.2 — Sideways Breakout ≥10% + Value >5B
-        # Range 20 hari ≤ 10% → konfirmasi sideways
-        # Pakai kondisi breakout yang sama dengan V2.1
-        # ==========================================
-        sideways_range = (h1['Resisten_20'] - h1['Support_20']) / h1['Support_20']
-        c_v22 = (
-            (sideways_range <= 0.10)                                          # sideways ketat ≤10%
-            and (h0['Close'] > h0['SMA_5'])                                  # H-0 di atas SMA5
-            and ((h0['Close'] - h0['SMA_5']) / h0['SMA_5'] >= 0.10)        # gap ≥ 10%
-            and (h0['Value_Trx'] >= 5_000_000_000)
-        )
-        if c_v22:
-            triggered.append("V2.2 (Sideways Breakout)")
-
-        # ==========================================
-        # BB REVERSAL — Bounce dari Lower Band
-        # H-1: low < BB_LOWER, close < BB_LOWER, candle merah
-        # H-0: close > BB_LOWER, candle hijau, higher high & close, volume naik
-        # ==========================================
-        c_bb_rev = (
-            (h1['Low'] < h1['BB_LOWER'])          # H-1 low tembus BB Lower
-            and (h1['Close'] < h1['BB_LOWER'])     # H-1 close di bawah BB Lower
-            and (h1['Close'] < h1['Open'])          # H-1 candle merah
-            and (h0['Close'] > h0['BB_LOWER'])      # H-0 close di atas BB Lower
-            and (h0['Close'] > h0['Open'])           # H-0 candle hijau
-            and (h0['Volume'] > h1['Volume'])        # volume naik
-            and (h0['High'] > h1['High'])            # higher high
-            and (h0['Close'] > h1['Close'])          # higher close
-            and (h0['Value_Trx'] >= 1_000_000_000)
-        )
-        if c_bb_rev:
-            triggered.append("BB Reversal")
-
-        # ==========================================
-        # BB MID — Pullback ke Middle Band
-        # H-1: candle hijau, low masih di atas BB_MID (belum sentuh)
-        # H-0: candle merah, close mendekati BB_MID (±2%), masih di atas BB_MID
-        #       EMA10 > EMA20 > EMA50, bandwidth ≥ 0.10
-        # ==========================================
-        c_bb_mid = (
-            (h1['Close'] > h1['Open'])                           # H-1 hijau
-            and (h1['Low'] > h1['BB_MID'])                       # H-1 belum sentuh BB MID
-            and (h0['Close'] < h0['Open'])                       # H-0 merah (koreksi)
-            and (h0['Close'] >= h0['BB_MID'] * 0.98)            # H-0 tidak terlalu jauh di bawah
-            and (h0['Close'] <= h0['BB_MID'] * 1.02)            # H-0 dekat BB MID
-            and (h0['Close'] > h0['BB_MID'])                     # H-0 close masih di atas BB MID
-            and (h0['EMA_10'] > h0['EMA_20'])                    # uptrend EMA
-            and (h0['EMA_20'] > h0['EMA_50'])
-            and (h0['BB_BW'] >= 0.10)                            # band cukup lebar
-            and (h0['Value_Trx'] >= 1_000_000_000)
-        )
-        if c_bb_mid:
-            triggered.append("BB MID (Pullback)")
-
-        # ==========================================
-        # MA 50 — First Touch Pullback (Uptrend)
-        # LLV_5: low minimum 5 candle sebelumnya > MA50 (belum pernah tembus)
-        # H-0: candle merah, close di sekitar MA50 (±1-2%), MA50 > MA200
-        # ==========================================
-        llv5 = df['LLV_5'].iloc[-1]   # sudah dihitung dengan shift(1).rolling(5)
         c_ma50 = (
-            (llv5 > h1['MA_50'])                                  # 5 candle sebelumnya tidak tembus MA50
-            and (h0['MA_50'] > h0['MA_200'])                      # uptrend
-            and (h0['Close'] >= h0['MA_50'] * 0.99)              # close tidak terlalu jauh di bawah
-            and (h0['Close'] <= h0['MA_50'] * 1.02)              # close dekat MA50
-            and (h0['Close'] < h0['Open'])                        # candle merah (buy on red)
-            and (h0['Value_Trx'] >= 1_000_000_000)
+            (h0['LLV_5'] > h0['MA_50'])                       # prev llv("low",5) > sma50
+            and (h0['Close'] >= h0['MA_50'] * 0.99)           # close >= sma50 * 0.99
+            and (h0['Close'] <= h0['MA_50'] * 1.02)           # close <= sma50 * 1.02
+            and (h0['Value_Trx'] >= 1_000_000_000)            # current value > 1b
+            and (h0['MA_50'] > h0['MA_200'])                  # Rules: MA 50 > MA 200
+            and (h0['Close'] < h0['Open'])                    # Rules: Buy ketika candle merah
+            and (h0['Close'] > h0['MA_50'])                   # Rules: di atas MA 50
         )
         if c_ma50:
             triggered.append("MA 50 (Pullback)")
 
         # ==========================================
-        # MA 200 — First Touch Pullback (Uptrend)
-        # LLV_5: low minimum 5 candle sebelumnya > MA200
-        # H-0: candle merah, close di sekitar MA200 (±1-2%), MA50 > MA200
+        # MA 200 (Pullback)
         # ==========================================
         c_ma200 = (
-            (llv5 > h1['MA_200'])                                  # 5 candle sebelumnya tidak tembus MA200
-            and (h0['MA_50'] > h0['MA_200'])                       # uptrend
-            and (h0['Close'] >= h0['MA_200'] * 0.99)              # close dekat MA200
-            and (h0['Close'] <= h0['MA_200'] * 1.02)
-            and (h0['Close'] < h0['Open'])                         # candle merah
-            and (h0['Value_Trx'] >= 1_000_000_000)
+            (h0['LLV_5'] > h0['MA_200'])                      # prev llv("low",5) > sma200
+            and (h0['Close'] >= h0['MA_200'] * 0.99)          # close >= sma200 * 0.99
+            and (h0['Close'] <= h0['MA_200'] * 1.02)          # close <= sma200 * 1.02
+            and (h0['Value_Trx'] >= 1_000_000_000)            # current value > 1b
+            and (h0['MA_50'] > h0['MA_200'])                  # Rules: MA 50 > MA 200
+            and (h0['Close'] < h0['Open'])                    # Rules: Buy ketika candle merah
+            and (h0['Close'] > h0['MA_200'])                  # Rules: di atas MA 200
         )
         if c_ma200:
             triggered.append("MA 200 (Pullback)")
 
+        # ==========================================
+        # BB MID
+        # ==========================================
+        c_bb_mid = (
+            (h0['Close'] >= h0['BB_MID'] * 0.98)              # close >= bollinger_mean * 0.98
+            and (h0['Close'] <= h0['BB_MID'] * 1.02)          # close <= bollinger_mean * 1.02
+            and (h0['Value_Trx'] >= 1_000_000_000)            # current value > 1b
+            and (h0['EMA_10'] > h0['EMA_20'])                 # ema10 > ema20
+            and (h0['EMA_20'] > h0['EMA_50'])                 # ema20 > ema50
+            and (h0['BB_BW'] >= 0.1)                          # bollinger_bandwidth >= 0.1
+            and (h0['Close'] > h0['BB_MID'])                  # close > bollinger_mean
+            and (h0['Close'] < h0['Open'])                    # Rules: Buy ketika candle merah diatas BB MID
+        )
+        if c_bb_mid:
+            triggered.append("BB MID")
+
+        # ==========================================
+        # BB REVERSAL
+        # ==========================================
+        c_bb_rev = (
+            (h1['Low'] < h1['BB_LOWER'])                      # prev llv("Low",1) < bollinger_bottom
+            and (h1['Close'] < h1['BB_LOWER'])                # prev close < bollinger_bottom
+            and (h0['Close'] > h0['BB_LOWER'])                # close > bollinger_bottom
+            and (h0['Value_Trx'] >= 1_000_000_000)            # current value > 1b
+            and (h0['Volume'] > h1['Volume'])                 # current volume > prev volume
+            and (h1['High'] < h0['High'])                     # prev high < current high
+            and (h0['Close'] > h1['Close'])                   # current close > prev close
+            and (h1['Close'] < h1['Open'])                    # Rules: Candle sebelumnya merah
+            and (h0['Close'] > h0['Open'])                    # Rules: Candle sekarang hijau
+        )
+        if c_bb_rev:
+            triggered.append("BB Reversal")
+
+        # ==========================================
+        # SCREENER V1.1 (Reversal)
+        # ==========================================
+        c_v11 = (
+            (h0['Volume'] > h1['Volume'])                     # volume > prev volume
+            and (h1['Close'] < h0['Close'])                   # prev close < current price
+            and (h0['Close'] > h0['MA_5'])                    # current price > sma5
+            and (h0['Value_Trx'] >= 5_000_000_000)            # current value > 5000000000
+            and (h1['Close'] < h1['Open'])                    # Rules: Candle sebelumnya merah
+            and (h1['Close'] < h1['MA_5'])                    # Rules: di bawah SMA 5
+            and (h0['Close'] > h0['Open'])                    # Rules: Candle sekarang hijau
+        )
+        if c_v11:
+            triggered.append("V1.1 (Reversal)")
+
+        # ==========================================
+        # SCREENER V1.2 (Pullback)
+        # ==========================================
+        c_v12 = (
+            (h0['Close'] > h0['MA_5'])                        # current price > sma5
+            and (h1['Close'] > h1['MA_5'])                    # prev close > sma5
+            and (h2['Close'] > h2['MA_5'])                    # prev_2 close > sma5
+            and (h2['High'] / h3['Close'] >= 1.1)             # Prev_2 High / prev_3 close >= 1.1
+            and (h1['Close'] < h2['Close'])                   # Prev close < Prev_2 close
+            and (h0['Close'] < h1['Close'])                   # current price < prev close
+            and (h0['Value_Trx'] >= 1_000_000_000)            # current value > 1000000000
+            and (h0['Close'] < h0['Open'])                    # Rules: Candle sekarang merah/koreksi mendekati SMA 5
+        )
+        if c_v12:
+            triggered.append("V1.2 (Pullback)")
+
+        # ==========================================
+        # SCREENER V1.3 (Continuation)
+        # ==========================================
+        c_v13 = (
+            (h0['Volume'] > h1['Volume'])                     # volume > prev volume
+            and (h1['Close'] < h0['Close'])                   # prev close < current price
+            and (h0['Close'] > h0['MA_5'])                    # current price > sma5
+            and (h0['Value_Trx'] >= 5_000_000_000)            # current value > 5000000000
+            and (h1['Close'] > h1['Open']) and (h1['Close'] > h1['MA_5'])   # Rules: 3 candle sebelumnya hijau
+            and (h2['Close'] > h2['Open']) and (h2['Close'] > h2['MA_5'])   # dan berada di atas SMA 5
+            and (h3['Close'] > h3['Open']) and (h3['Close'] > h3['MA_5'])
+            and (h0['Close'] > h1['Resisten_20'])             # Rules: Baru saja break dari resistance kuat
+        )
+        if c_v13:
+            triggered.append("V1.3 (Continuation)")
+
+        # ==========================================
+        # SCREENER V2.1 (Reversal Break SMA5 ≥ 10%)
+        # ==========================================
+        c_v21 = (
+            (h0['Volume'] > h1['Volume'])                     # volume > prev volume
+            and (h1['Close'] < h0['Close'])                   # prev close < current price
+            and (h0['Close'] > h0['MA_5'])                    # current price > sma5
+            and (h0['Value_Trx'] >= 5_000_000_000)            # current value > 5000000000
+            and (h0['High'] / h1['Close'] >= 1.10)            # high/prev close >= 1.10
+            and (h1['Close'] < h1['MA_5'])                    # Rules: Harga saham sebelumnya < SMA 5
+        )
+        if c_v21:
+            triggered.append("V2.1 (Reversal)")
+
+        # ==========================================
+        # SCREENER V2.2 (Sideways Breakout ≥ 10%)
+        # ==========================================
+        sideways_range = (h1['Resisten_20'] - h1['Support_20']) / h1['Support_20']
+        c_v22 = (
+            (sideways_range <= 0.12)                          # Rules: Harga saham sideways ketat sebelum breakout
+            and (h0['Volume'] > h1['Volume'])                 # volume > prev volume
+            and (h1['Close'] < h0['Close'])                   # prev close < current price
+            and (h0['Close'] > h0['MA_5'])                    # current price > sma5
+            and (h0['Value_Trx'] >= 5_000_000_000)            # current value > 5000000000
+            and (h0['High'] / h1['Close'] >= 1.10)            # high/prev close >= 1.10
+        )
+        if c_v22:
+            triggered.append("V2.2 (Sideways Breakout)")
+
+        # RETURN HASIL JIKA ADA STRATEGI YANG TERATUR
         if triggered:
             return {
                 "Ticker"          : ticker,
@@ -275,7 +263,7 @@ def scan_single_stock(ticker: str) -> dict | None:
 
 
 # ============================================================
-# UI & LOGIKA UTAMA
+# UI & DRIVER UTAMA (STREAMLIT)
 # ============================================================
 st.sidebar.header("⚙️ Kontrol Pemindai")
 max_workers = st.sidebar.slider(
@@ -286,11 +274,11 @@ max_workers = st.sidebar.slider(
 ALL_STRATEGIES = [
     "V1.1 (Reversal)",
     "V1.2 (Pullback)",
-    "V1.3 (Breakout Resisten/Continuation)",
+    "V1.3 (Continuation)",
     "V2.1 (Reversal)",
     "V2.2 (Sideways Breakout)",
     "BB Reversal",
-    "BB MID (Pullback)",
+    "BB MID",
     "MA 50 (Pullback)",
     "MA 200 (Pullback)",
 ]
@@ -323,6 +311,8 @@ if st.button("🚀 MULAI PEMINDAIAN SELURUH SAHAM IDX (REAL-TIME)"):
         df_all = pd.DataFrame(results)
 
         st.markdown("### 📊 Hasil Berdasarkan Strategi")
+        st.info("💡 **💡 Target Day Trading Yang Mulia:** TP1: 1-2% | TP2: 2-5% | TP3: 5-9% (Gunakan Trailing Stop untuk TP2/TP3)")
+        
         tabs = st.tabs(ALL_STRATEGIES)
 
         for tab, strat in zip(tabs, ALL_STRATEGIES):
