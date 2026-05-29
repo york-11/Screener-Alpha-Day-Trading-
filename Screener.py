@@ -176,12 +176,9 @@ def scan_single_stock(ticker: str) -> dict | None:
         # ==========================================
         c_v11 = (
             (h0['Volume'] > h1['Volume'])                     # volume > prev volume
-            and (h1['Close'] < h0['Close'])                   # prev close < current price
             and (h0['Close'] > h0['MA_5'])                    # current price > sma5
             and (h0['Value_Trx'] >= 5_000_000_000)            # current value > 5000000000
-            and (h1['Close'] < h1['Open'])                    # Rules: Candle sebelumnya merah
-            and (h1['Close'] < h1['MA_5'])                    # Rules: di bawah SMA 5
-            and (h0['Close'] > h0['Open'])                    # Rules: Candle sekarang hijau
+            and (h1['Close'] < h0['Close'])                    # Rules: Candle sebelumnya merah
         )
         if c_v11:
             triggered.append("V1.1 (Reversal)")
