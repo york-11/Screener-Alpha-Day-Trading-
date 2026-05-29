@@ -64,7 +64,7 @@ idx_tickers = sorted(list(set(t for t in raw_tickers.split(',') if t.strip())))
 
 
 # ============================================================
-# ENGINE: SCAN SATU SAHAM (SINKRONISASI TOTAL)
+# ENGINE: SCAN SATU SAHAM 
 # ============================================================
 def scan_single_stock(ticker: str) -> dict | None:
     try:
@@ -75,9 +75,7 @@ def scan_single_stock(ticker: str) -> dict | None:
 
         df.index = df.index.tz_localize(None)
 
-        # ----------------------------------------------------------
-        # KALKULASI INDIKATOR KUNCI
-        # ----------------------------------------------------------
+        # Perhitungan Indikator Kunci
         df['MA_5']        = df['Close'].rolling(5).mean()
         df['MA_50']       = df['Close'].rolling(50).mean()
         df['MA_200']      = df['Close'].rolling(200).mean()
@@ -97,10 +95,9 @@ def scan_single_stock(ticker: str) -> dict | None:
         df['EMA_20'] = df['Close'].ewm(span=20, adjust=False).mean()
         df['EMA_50'] = df['Close'].ewm(span=50, adjust=False).mean()
 
-        # LLV Kunci (H-1 ke belakang)
+        # LLV Kunci
         df['LLV_5'] = df['Low'].shift(1).rolling(5).min()
 
-        # Ekstraksi Baris Candle (H-0 s.d H-3)
         h0 = df.iloc[-1]   # Hari ini
         h1 = df.iloc[-2]   # Kemarin
         h2 = df.iloc[-3]   # 2 Hari lalu
@@ -112,13 +109,13 @@ def scan_single_stock(ticker: str) -> dict | None:
         # MA 50 (Pullback)
         # ==========================================
         c_ma50 = (
-            (h0['LLV_5'] > h0['MA_50'])                       # prev llv("low",5) > sma50
-            and (h0['Close'] >= h0['MA_50'] * 0.99)           # close >= sma50 * 0.99
-            and (h0['Close'] <= h0['MA_50'] * 1.02)           # close <= sma50 * 1.02
-            and (h0['Value_Trx'] >= 1_000_000_000)            # current value > 1b
-            and (h0['MA_50'] > h0['MA_200'])                  # Rules: MA 50 > MA 200
-            and (h0['Close'] < h0['Open'])                    # Rules: Buy ketika candle merah
-            and (h0['Close'] > h0['MA_50'])                   # Rules: di atas MA 50
+            (h0['LLV_5'] > h0['MA_50'])
+            and (h0['Close'] >= h0['MA_50'] * 0.99)
+            and (h0['Close'] <= h0['MA_50'] * 1.02)
+            and (h0['Value_Trx'] >= 1_000_000_000)
+            and (h0['MA_50'] > h0['MA_200'])
+            and (h0['Close'] < h0['Open'])
+            and (h0['Close'] > h0['MA_50'])
         )
         if c_ma50:
             triggered.append("MA 50 (Pullback)")
@@ -127,13 +124,13 @@ def scan_single_stock(ticker: str) -> dict | None:
         # MA 200 (Pullback)
         # ==========================================
         c_ma200 = (
-            (h0['LLV_5'] > h0['MA_200'])                      # prev llv("low",5) > sma200
-            and (h0['Close'] >= h0['MA_200'] * 0.99)          # close >= sma200 * 0.99
-            and (h0['Close'] <= h0['MA_200'] * 1.02)          # close <= sma200 * 1.02
-            and (h0['Value_Trx'] >= 1_000_000_000)            # current value > 1b
-            and (h0['MA_50'] > h0['MA_200'])                  # Rules: MA 50 > MA 200
-            and (h0['Close'] < h0['Open'])                    # Rules: Buy ketika candle merah
-            and (h0['Close'] > h0['MA_200'])                  # Rules: di atas MA 200
+            (h0['LLV_5'] > h0['MA_200'])
+            and (h0['Close'] >= h0['MA_200'] * 0.99)
+            and (h0['Close'] <= h0['MA_200'] * 1.02)
+            and (h0['Value_Trx'] >= 1_000_000_000)
+            and (h0['MA_50'] > h0['MA_200'])
+            and (h0['Close'] < h0['Open'])
+            and (h0['Close'] > h0['MA_200'])
         )
         if c_ma200:
             triggered.append("MA 200 (Pullback)")
@@ -142,14 +139,14 @@ def scan_single_stock(ticker: str) -> dict | None:
         # BB MID
         # ==========================================
         c_bb_mid = (
-            (h0['Close'] >= h0['BB_MID'] * 0.98)              # close >= bollinger_mean * 0.98
-            and (h0['Close'] <= h0['BB_MID'] * 1.02)          # close <= bollinger_mean * 1.02
-            and (h0['Value_Trx'] >= 1_000_000_000)            # current value > 1b
-            and (h0['EMA_10'] > h0['EMA_20'])                 # ema10 > ema20
-            and (h0['EMA_20'] > h0['EMA_50'])                 # ema20 > ema50
-            and (h0['BB_BW'] >= 0.1)                          # bollinger_bandwidth >= 0.1
-            and (h0['Close'] > h0['BB_MID'])                  # close > bollinger_mean
-            and (h0['Close'] < h0['Open'])                    # Rules: Buy ketika candle merah diatas BB MID
+            (h0['Close'] >= h0['BB_MID'] * 0.98)
+            and (h0['Close'] <= h0['BB_MID'] * 1.02)
+            and (h0['Value_Trx'] >= 1_000_000_000)
+            and (h0['EMA_10'] > h0['EMA_20'])
+            and (h0['EMA_20'] > h0['EMA_50'])
+            and (h0['BB_BW'] >= 0.1)
+            and (h0['Close'] > h0['BB_MID'])
+            and (h0['Close'] < h0['Open'])
         )
         if c_bb_mid:
             triggered.append("BB MID")
@@ -158,15 +155,15 @@ def scan_single_stock(ticker: str) -> dict | None:
         # BB REVERSAL
         # ==========================================
         c_bb_rev = (
-            (h1['Low'] < h1['BB_LOWER'])                      # prev llv("Low",1) < bollinger_bottom
-            and (h1['Close'] < h1['BB_LOWER'])                # prev close < bollinger_bottom
-            and (h0['Close'] > h0['BB_LOWER'])                # close > bollinger_bottom
-            and (h0['Value_Trx'] >= 1_000_000_000)            # current value > 1b
-            and (h0['Volume'] > h1['Volume'])                 # current volume > prev volume
-            and (h1['High'] < h0['High'])                     # prev high < current high
-            and (h0['Close'] > h1['Close'])                   # current close > prev close
-            and (h1['Close'] < h1['Open'])                    # Rules: Candle sebelumnya merah
-            and (h0['Close'] > h0['Open'])                    # Rules: Candle sekarang hijau
+            (h1['Low'] < h1['BB_LOWER'])
+            and (h1['Close'] < h1['BB_LOWER'])
+            and (h0['Close'] > h0['BB_LOWER'])
+            and (h0['Value_Trx'] >= 1_000_000_000)
+            and (h0['Volume'] > h1['Volume'])
+            and (h1['High'] < h0['High'])
+            and (h0['Close'] > h1['Close'])
+            and (h1['Close'] < h1['Open'])
+            and (h0['Close'] > h0['Open'])
         )
         if c_bb_rev:
             triggered.append("BB Reversal")
@@ -175,11 +172,13 @@ def scan_single_stock(ticker: str) -> dict | None:
         # SCREENER V1.1 (Reversal)
         # ==========================================
         c_v11 = (
-            (h0['Volume'] > h1['Volume'])                     # volume > prev volume
-            and (h0['Close'] > h0['MA_5'])                    # current price > sma5
-            and (h0['Value_Trx'] >= 5_000_000_000)            # current value > 5000000000
-            and (h1['Close'] < h0['Close'])                   # Rules: Candle sebelumnya merah
-            and (h1['Close'] < h1["MA5"])                     # Candle sebelumnya dibawah SMA5
+            (h0['Volume'] > h1['Volume'])
+            and (h1['Close'] < h0['Close'])
+            and (h0['Close'] > h0['MA_5'])
+            and (h0['Value_Trx'] >= 5_000_000_000)
+            and (h1['Close'] < h1['Open'])
+            and (h1['Close'] < h1['MA_5'])
+            and (h0['Close'] > h0['Open'])
         )
         if c_v11:
             triggered.append("V1.1 (Reversal)")
@@ -188,14 +187,14 @@ def scan_single_stock(ticker: str) -> dict | None:
         # SCREENER V1.2 (Pullback)
         # ==========================================
         c_v12 = (
-            (h0['Close'] > h0['MA_5'])                        # current price > sma5
-            and (h1['Close'] > h1['MA_5'])                    # prev close > sma5
-            and (h2['Close'] > h2['MA_5'])                    # prev_2 close > sma5
-            and (h2['High'] / h3['Close'] >= 1.1)             # Prev_2 High / prev_3 close >= 1.1
-            and (h1['Close'] < h2['Close'])                   # Prev close < Prev_2 close
-            and (h0['Close'] < h1['Close'])                   # current price < prev close
-            and (h0['Value_Trx'] >= 1_000_000_000)            # current value > 1000000000
-            and (h0['Close'] < h0['Open'])                    # Rules: Candle sekarang merah/koreksi mendekati SMA 5
+            (h0['Close'] > h0['MA_5'])
+            and (h1['Close'] > h1['MA_5'])
+            and (h2['Close'] > h2['MA_5'])
+            and (h2['High'] / h3['Close'] >= 1.1)
+            and (h1['Close'] < h2['Close'])
+            and (h0['Close'] < h1['Close'])
+            and (h0['Value_Trx'] >= 1_000_000_000)
+            and (h0['Close'] < h0['Open'])
         )
         if c_v12:
             triggered.append("V1.2 (Pullback)")
@@ -204,14 +203,14 @@ def scan_single_stock(ticker: str) -> dict | None:
         # SCREENER V1.3 (Continuation)
         # ==========================================
         c_v13 = (
-            (h0['Volume'] > h1['Volume'])                     # volume > prev volume
-            and (h1['Close'] < h0['Close'])                   # prev close < current price
-            and (h0['Close'] > h0['MA_5'])                    # current price > sma5
-            and (h0['Value_Trx'] >= 5_000_000_000)            # current value > 5000000000
-            and (h1['Close'] > h1['Open']) and (h1['Close'] > h1['MA_5'])   # Rules: 3 candle sebelumnya hijau
-            and (h2['Close'] > h2['Open']) and (h2['Close'] > h2['MA_5'])   # dan berada di atas SMA 5
+            (h0['Volume'] > h1['Volume'])
+            and (h1['Close'] < h0['Close'])
+            and (h0['Close'] > h0['MA_5'])
+            and (h0['Value_Trx'] >= 5_000_000_000)
+            and (h1['Close'] > h1['Open']) and (h1['Close'] > h1['MA_5'])
+            and (h2['Close'] > h2['Open']) and (h2['Close'] > h2['MA_5'])
             and (h3['Close'] > h3['Open']) and (h3['Close'] > h3['MA_5'])
-            and (h0['Close'] > h1['Resisten_20'])             # Rules: Baru saja break dari resistance kuat
+            and (h0['Close'] > h1['Resisten_20'])
         )
         if c_v13:
             triggered.append("V1.3 (Continuation)")
@@ -220,12 +219,12 @@ def scan_single_stock(ticker: str) -> dict | None:
         # SCREENER V2.1 (Reversal Break SMA5 ≥ 10%)
         # ==========================================
         c_v21 = (
-            (h0['Volume'] > h1['Volume'])                     # volume > prev volume
-            and (h1['Close'] < h0['Close'])                   # prev close < current price
-            and (h0['Close'] > h0['MA_5'])                    # current price > sma5
-            and (h0['Value_Trx'] >= 5_000_000_000)            # current value > 5000000000
-            and (h0['High'] / h1['Close'] >= 1.10)            # high/prev close >= 1.10
-            and (h1['Close'] < h1['MA_5'])                    # Rules: Harga saham sebelumnya < SMA 5
+            (h0['Volume'] > h1['Volume'])
+            and (h1['Close'] < h0['Close'])
+            and (h0['Close'] > h0['MA_5'])
+            and (h0['Value_Trx'] >= 5_000_000_000)
+            and (h0['High'] / h1['Close'] >= 1.10)
+            and (h1['Close'] < h1['MA_5'])
         )
         if c_v21:
             triggered.append("V2.1 (Reversal)")
@@ -235,17 +234,16 @@ def scan_single_stock(ticker: str) -> dict | None:
         # ==========================================
         sideways_range = (h1['Resisten_20'] - h1['Support_20']) / h1['Support_20']
         c_v22 = (
-            (sideways_range <= 0.12)                          # Rules: Harga saham sideways ketat sebelum breakout
-            and (h0['Volume'] > h1['Volume'])                 # volume > prev volume
-            and (h1['Close'] < h0['Close'])                   # prev close < current price
-            and (h0['Close'] > h0['MA_5'])                    # current price > sma5
-            and (h0['Value_Trx'] >= 5_000_000_000)            # current value > 5000000000
-            and (h0['High'] / h1['Close'] >= 1.10)            # high/prev close >= 1.10
+            (sideways_range <= 0.12)
+            and (h0['Volume'] > h1['Volume'])
+            and (h1['Close'] < h0['Close'])
+            and (h0['Close'] > h0['MA_5'])
+            and (h0['Value_Trx'] >= 5_000_000_000)
+            and (h0['High'] / h1['Close'] >= 1.10)
         )
         if c_v22:
             triggered.append("V2.2 (Sideways Breakout)")
 
-        # RETURN HASIL JIKA ADA STRATEGI YANG TERATUR
         if triggered:
             return {
                 "Ticker"          : ticker,
@@ -269,6 +267,52 @@ max_workers = st.sidebar.slider(
     help="Semakin tinggi semakin cepat, tapi bisa kena rate-limit yfinance."
 )
 
+# ------------------------------------------------------------
+# FITUR AUDIT INVESTIGASI (MODUL BARU)
+# ------------------------------------------------------------
+st.sidebar.markdown("---")
+st.sidebar.subheader("🛠️ Investigasi Sinyal (Audit V1.1)")
+debug_ticker = st.sidebar.text_input("Ketik Ticker (Contoh: BUMI)", "").upper().strip()
+
+if debug_ticker:
+    st.markdown(f"### 🛡️ Laporan Audit Kegagalan Data V1.1: **{debug_ticker}**")
+    try:
+        df_db = yf.Ticker(f"{debug_ticker}.JK").history(period="1y")
+        if df_db.empty or len(df_db) < 10:
+            st.error("❌ Data dari yfinance ampas! Ticker nggak ditemukan atau kosong.")
+        else:
+            df_db.index = df_db.index.tz_localize(None)
+            df_db['MA_5'] = df_db['Close'].rolling(5).mean()
+            df_db['Value_Trx'] = df_db['Close'] * df_db['Volume']
+            
+            h0 = df_db.iloc[-1]
+            h1 = df_db.iloc[-2]
+            
+            audit_box = [
+                {"Syarat Algoritma": "1. Volume Hari Ini > Kemarin", "Kondisi": h0['Volume'] > h1['Volume'], "Nilai Riil (yfinance)": f"{h0['Volume']:,} vs {h1['Volume']:,}"},
+                {"Syarat Algoritma": "2. Close Hari Ini > Kemarin", "Kondisi": h0['Close'] > h1['Close'], "Nilai Riil (yfinance)": f"Rp {h0['Close']} vs Rp {h1['Close']}"},
+                {"Syarat Algoritma": "3. Close Hari Ini > MA5 Hari Ini", "Kondisi": h0['Close'] > h0['MA_5'], "Nilai Riil (yfinance)": f"Rp {h0['Close']} vs MA5: {h0['MA_5']:.2f}"},
+                {"Syarat Algoritma": "4. Value Transaksi Hari Ini >= 5 Miliar", "Kondisi": h0['Value_Trx'] >= 5_000_000_000, "Nilai Riil (yfinance)": f"Rp {h0['Value_Trx']/1e9:.3f} Miliar"},
+                {"Syarat Algoritma": "5. Candle Kemarin Wajib Merah (Close < Open)", "Kondisi": h1['Close'] < h1['Open'], "Nilai Riil (yfinance)": f"C: {h1['Close']} | O: {h1['Open']}"},
+                {"Syarat Algoritma": "6. Close Kemarin < MA5 Kemarin", "Kondisi": h1['Close'] < h1['MA_5'], "Nilai Riil (yfinance)": f"Rp {h1['Close']} vs MA5: {h1['MA_5']:.2f}"},
+                {"Syarat Algoritma": "7. Candle Hari Ini Wajib Ijo (Close > Open)", "Kondisi": h0['Close'] > h0['Open'], "Nilai Riil (yfinance)": f"C: {h0['Close']} | O: {h0['Open']}"},
+            ]
+            
+            df_audit = pd.DataFrame(audit_box)
+            df_audit['Status Filter'] = df_audit['Kondisi'].apply(lambda x: "✅ TEMBUS" if x else "❌ REJECT")
+            
+            st.table(df_audit[["Syarat Algoritma", "Status Filter", "Nilai Riil (yfinance)"]])
+            
+            if df_audit['Kondisi'].all():
+                st.success(f"Logika aman! Saham {debug_ticker} harusnya tembus radar screener utama.")
+            else:
+                st.warning(f"Kelebatan Sinyal Terbuka! Saham {debug_ticker} mental dari mesin karena status '❌ REJECT' di atas.")
+    except Exception as e:
+        st.error(f"Gagal mengecek data emiten: {e}")
+
+# ------------------------------------------------------------
+# CORE SCREENER ENGINE
+# ------------------------------------------------------------
 ALL_STRATEGIES = [
     "V1.1 (Reversal)",
     "V1.2 (Pullback)",
@@ -281,6 +325,7 @@ ALL_STRATEGIES = [
     "MA 200 (Pullback)",
 ]
 
+st.markdown("---")
 if st.button("🚀 MULAI PEMINDAIAN SELURUH SAHAM IDX (REAL-TIME)"):
     progress_bar = st.progress(0)
     status_text  = st.empty()
@@ -309,7 +354,7 @@ if st.button("🚀 MULAI PEMINDAIAN SELURUH SAHAM IDX (REAL-TIME)"):
         df_all = pd.DataFrame(results)
 
         st.markdown("### 📊 Hasil Berdasarkan Strategi")
-        st.info("💡 **💡 Target Day Trading Yang Mulia:** TP1: 1-2% | TP2: 2-5% | TP3: 5-9% (Gunakan Trailing Stop untuk TP2/TP3)")
+        st.info("💡 **Target Day Trading Yang Mulia:** TP1: 1-2% | TP2: 2-5% | TP3: 5-9% (Gunakan Trailing Stop)")
         
         tabs = st.tabs(ALL_STRATEGIES)
 
